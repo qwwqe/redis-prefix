@@ -8,10 +8,12 @@ export default interface Benchmark {
 
 export type Options = {
   maxKeyLength: number;
+  initKeys: number;
 };
 
 export const DefaultOptions: Options = {
   maxKeyLength: 15,
+  initKeys: 100000,
 };
 
 export abstract class BaseBenchmark implements Benchmark {
