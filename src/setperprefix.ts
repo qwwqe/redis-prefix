@@ -2,9 +2,9 @@ import { ChainableCommander } from "ioredis";
 import { BaseBenchmark } from "./benchmark";
 
 export default class SetPerPrefix extends BaseBenchmark {
-  private scoreSetName = `${this.options.keyPrefix}:scores` as const;
+  protected scoreSetPrefix = `${this.options.keyPrefix}:scores` as const;
 
-  private keys: Set<string> = new Set([this.scoreSetName]);
+  protected keys: Set<string> = new Set();
 
   async initialize(): Promise<void> {
     await this.connected;
@@ -22,24 +22,16 @@ export default class SetPerPrefix extends BaseBenchmark {
           const score = scores[i];
 
           for (let j = 0; j < completion.length; j++) {
-            const prefix = completion.slice(0, j + 1);
-            const key = `${thiz.options.keyPrefix}:${prefix}`;
+            const completionPrefix = completion.slice(0, j + 1);
+            const key = `${thiz.scoreSetPrefix}:${completionPrefix}`;
             thiz.keys.add(key);
 
             yield (pipeline: ChainableCommander) => {
-              pipeline.zadd(thiz.scoreSetName, score, key);
+              pipeline.zadd(key, score, completion);
             };
           }
         }
       })(this)
     );
-  }
-
-  async memoryUsage(): Promise<number> {
-    return 0;
-  }
-
-  async cleanUp(): Promise<number> {
-    return 0;
   }
 }
