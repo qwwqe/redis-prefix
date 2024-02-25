@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import Redis, { ChainableCommander } from "ioredis";
 
 export default interface Benchmark {
   initialize(): Promise<void>;
@@ -9,23 +9,34 @@ export default interface Benchmark {
 export type Options = {
   maxKeyLength: number;
   initKeys: number;
+  keyPrefix: string;
+  pipelineBatchSize: number;
 };
 
 export const DefaultOptions: Options = {
   maxKeyLength: 15,
   initKeys: 100000,
+  keyPrefix: "benchmark",
+  pipelineBatchSize: 10000,
 };
 
 export abstract class BaseBenchmark implements Benchmark {
   options: Options;
 
-  redis: Redis = new Redis();
+  redis: Redis;
+
+  connected: Promise<boolean>;
 
   constructor(options?: Partial<Options>) {
     this.options = {
       ...DefaultOptions,
       ...options,
     };
+
+    this.redis = new Redis();
+    this.connected = new Promise((resolve) =>
+      this.redis.on("connect", resolve)
+    );
   }
 
   abstract initialize(): Promise<void>;
@@ -59,5 +70,34 @@ export abstract class BaseBenchmark implements Benchmark {
     }
 
     return strings;
+  }
+
+  async batchedPipeline(
+    generator: Generator<(pipeline: ChainableCommander) => any>
+  ) {
+    let pipeline = this.redis.pipeline();
+
+    for (const pipelineCall of generator) {
+      pipelineCall(pipeline);
+
+      if (pipeline.length >= this.options.pipelineBatchSize) {
+        const results = (await pipeline.exec()) || [];
+        results.forEach(([err, value]) => {
+          if (err) {
+            console.warn(`Pipeline error: ${err} (${value})`);
+          }
+        });
+        pipeline = this.redis.pipeline();
+      }
+    }
+
+    if (pipeline.length) {
+      const results = (await pipeline.exec()) || [];
+      results.forEach(([err, value]) => {
+        if (err) {
+          console.warn(`Pipeline error: ${err} (${value})`);
+        }
+      });
+    }
   }
 }
