@@ -27,6 +27,8 @@ export abstract class BaseBenchmark implements Benchmark {
 
   connected: Promise<boolean>;
 
+  protected keys: Set<string> = new Set();
+
   constructor(options?: Partial<Options>) {
     this.options = {
       ...DefaultOptions,
@@ -41,9 +43,43 @@ export abstract class BaseBenchmark implements Benchmark {
 
   abstract initialize(): Promise<void>;
 
-  abstract memoryUsage(): Promise<number>;
+  async memoryUsage(): Promise<number> {
+    const results = await this.batchedPipeline(
+      (function* (thiz: BaseBenchmark) {
+        for (const key of thiz.keys.values()) {
+          yield (pipeline: ChainableCommander) => {
+            pipeline.memory("USAGE", key);
+          };
+        }
+      })(this)
+    );
 
-  abstract cleanUp(): Promise<number>;
+    const totalUsage = results.reduce(
+      (sum, [err, value]) => (err ? sum : sum + value),
+      0
+    );
+
+    return totalUsage;
+  }
+
+  async cleanUp(): Promise<number> {
+    const results = await this.batchedPipeline(
+      (function* (thiz: BaseBenchmark) {
+        for (const key of thiz.keys.values()) {
+          yield (pipeline: ChainableCommander) => {
+            pipeline.del(key);
+          };
+        }
+      })(this)
+    );
+
+    const totalDeleted = results.reduce(
+      (sum, [err, value]) => (err ? sum : sum + value),
+      0
+    );
+
+    return totalDeleted;
+  }
 
   generateCJK(length: number): string;
 
@@ -76,6 +112,7 @@ export abstract class BaseBenchmark implements Benchmark {
     generator: Generator<(pipeline: ChainableCommander) => any>
   ) {
     let pipeline = this.redis.pipeline();
+    const totalResults: [err: Error | null, result: any][] = [];
 
     for (const pipelineCall of generator) {
       pipelineCall(pipeline);
@@ -87,6 +124,7 @@ export abstract class BaseBenchmark implements Benchmark {
             console.warn(`Pipeline error: ${err} (${value})`);
           }
         });
+        totalResults.push(...results);
         pipeline = this.redis.pipeline();
       }
     }
@@ -98,6 +136,9 @@ export abstract class BaseBenchmark implements Benchmark {
           console.warn(`Pipeline error: ${err} (${value})`);
         }
       });
+      totalResults.push(...results);
     }
+
+    return totalResults;
   }
 }
