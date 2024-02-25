@@ -22,7 +22,7 @@ export default class SingleSet extends BaseBenchmark {
           const score = scores[i];
 
           yield (pipeline: ChainableCommander) => {
-            pipeline.zadd(thiz.scoreSetPrefix, score, completion);
+            pipeline.zadd(thiz.scoreSetPrefix, 0, `${completion}:${score}`);
           };
         }
       })(this)

@@ -2,6 +2,7 @@ import SetPerPrefix from "./setperprefix";
 import Benchmark from "./benchmark";
 import CompressedSetPerPrefix from "./compressedsetperprefix";
 import SingleSet from "./singleset";
+import PrefixCachedSingleSet from "./prefixcachedsingleset";
 
 async function run(benchmark: Benchmark) {
   await benchmark.initialize();
@@ -18,6 +19,7 @@ const commands: { [command: string]: () => any } = {
   setPerPrefix: () => run(new SetPerPrefix()),
   compressedSetPerPrefix: () => run(new CompressedSetPerPrefix()),
   singleSet: () => run(new SingleSet()),
+  prefixCachedSingleSet: () => run(new PrefixCachedSingleSet()),
 };
 
 if (process.argv[2] in commands) {
